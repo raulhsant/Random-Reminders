@@ -5,6 +5,8 @@
 .DS_Store
 /build
 **/build/
+/signing.properties
+/app/random-reminders-release.p12
 /captures
 .externalNativeBuild
 .cxx

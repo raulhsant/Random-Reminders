@@ -92,6 +92,16 @@ O APK de depuração é gerado em `app/build/outputs/apk/debug/app-debug.apk`. C
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+### APK de release assinado
+
+A configuração de release lê as credenciais de `signing.properties` na raiz do projeto. O keystore e esse arquivo são locais e ignorados pelo Git. Para gerar o APK:
+
+```powershell
+.\gradlew.bat :app:assembleRelease
+```
+
+O arquivo será gerado em `app/build/outputs/apk/release/app-release.apk`. Mantenha uma cópia segura do keystore e de `signing.properties`: a mesma chave será necessária para assinar futuras atualizações do aplicativo. Nunca compartilhe nem versione esses arquivos.
+
 Os testes unitários cobrem a geração de horários e seus espaçamentos, a recorrência, a validação do formulário e a resolução do texto da notificação.
 
 ## Estrutura do projeto
