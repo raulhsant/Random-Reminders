@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Random Reminders</string>
+
+    <!-- Notificações -->
+    <string name="channel_reminders_name">Lembretes aleatórios</string>
+    <string name="channel_reminders_description">Notificações dos lembretes disparados em horários aleatórios</string>
+    <string name="reminder_notification_text">Hora do seu lembrete</string>
+
+    <!-- Tela de acionamento -->
+    <string name="activate_subtitle">Disparos aleatórios dentro de uma janela que você controla. 100% offline.</string>
+    <string name="field_start">Início (HH:mm)</string>
+    <string name="field_end">Fim (HH:mm)</string>
+    <string name="field_hint_time">Ex.: 07:30</string>
+    <string name="field_shots">Disparos por ciclo</string>
+    <string name="field_hint_shots">Quantos lembretes por dia do ciclo</string>
+    <string name="field_spacing">Espaçamento mínimo (min)</string>
+    <string name="field_hint_spacing">Menor intervalo permitido entre disparos</string>
+    <string name="field_interval">Repetir a cada N dias</string>
+    <string name="field_hint_interval">1 = todos os dias</string>
+    <string name="field_repeat">Repetir em outros dias</string>
+    <string name="field_create_enabled">Criar ligado</string>
+    <string name="field_active">Alarme ativo</string>
+    <string name="field_show_next_time">Mostrar próximo horário</string>
+    <string name="field_sound">Toque do alarme</string>
+    <string name="sound_default">Padrão do Android</string>
+    <string name="sound_silent">Sem som</string>
+    <string name="sound_selected_fallback">Toque selecionado</string>
+    <string name="action_select_sound">Selecionar toque</string>
+    <string name="summary_once">uma vez</string>
+
+    <!-- Lista / editor / histórico (etapa 2) -->
+    <string name="action_back">Voltar</string>
+    <string name="rule_add">Novo lembrete</string>
+    <string name="rule_list_empty">Nenhum lembrete ainda.\nToque em + para criar o primeiro.</string>
+    <string name="rule_list_no_results">Nenhum lembrete encontrado.</string>
+    <string name="rule_search">Buscar lembretes</string>
+    <string name="mascot_description">Cachorro mascote do Random Reminders</string>
+    <string name="rule_next_shot">Próximo disparo: %1$s</string>
+    <string name="rule_delete">Excluir lembrete</string>
+    <string name="rule_save">Salvar</string>
+    <string name="rule_title_new">Novo lembrete</string>
+    <string name="rule_title_edit">Editar lembrete</string>
+    <string name="field_name">Nome do lembrete</string>
+    <string name="field_hint_name">Ex.: Beber água</string>
+    <string name="field_description">Descrição da notificação</string>
+    <string name="field_hint_description">Opcional; aparece no texto da notificação</string>
+    <string name="history_title">Histórico</string>
+    <string name="history_empty">Nenhum disparo registrado ainda.</string>
+    <string name="history_deleted_rule">Lembrete apagado</string>
+</resources>
