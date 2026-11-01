@@ -74,6 +74,16 @@ android {
     }
 }
 
+tasks.configureEach {
+    if (name == "packageRelease") {
+        doFirst {
+            check(signingPropertiesFile.isFile) {
+                "Configure signing.properties before building the release APK."
+            }
+        }
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

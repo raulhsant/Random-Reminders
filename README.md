@@ -94,13 +94,24 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### APK de release assinado
 
-A configuração de release lê as credenciais de `signing.properties` na raiz do projeto. O keystore e esse arquivo são locais e ignorados pelo Git. Para gerar o APK:
+A configuração de release exige `signing.properties` na raiz do projeto e o keystore indicado em `storeFile`. O arquivo deve conter estas propriedades:
+
+```properties
+storeFile=app/random-reminders-release.p12
+storePassword=<senha-do-keystore>
+keyAlias=<alias-da-chave>
+keyPassword=<senha-da-chave>
+```
+
+`storeFile` pode ser um caminho relativo à raiz do projeto ou absoluto. O arquivo de configuração e o keystore são locais e ignorados pelo Git; não use credenciais reais em arquivos versionados. O build falha explicitamente se o arquivo, alguma propriedade ou o keystore estiver ausente.
+
+Para gerar o APK:
 
 ```powershell
 .\gradlew.bat :app:assembleRelease
 ```
 
-O arquivo será gerado em `app/build/outputs/apk/release/app-release.apk`. Mantenha uma cópia segura do keystore e de `signing.properties`: a mesma chave será necessária para assinar futuras atualizações do aplicativo. Nunca compartilhe nem versione esses arquivos.
+O arquivo será gerado em `app/build/outputs/apk/release/app-release.apk`. Mantenha uma cópia segura do keystore e das credenciais: a mesma chave será necessária para assinar futuras atualizações do aplicativo.
 
 Os testes unitários cobrem a geração de horários e seus espaçamentos, a recorrência, a validação do formulário e a resolução do texto da notificação.
 
