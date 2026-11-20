@@ -9,6 +9,7 @@ Aplicativo Android para criar lembretes que tocam em horários aleatórios dentr
 - Escolher o início e o fim da janela diária, o número de disparos por ciclo e o espaçamento mínimo entre eles.
 - Repetir a cada N dias (1 significa todos os dias) ou executar uma única vez.
 - Escolher o toque do alarme, usar o padrão do Android ou deixar o lembrete silencioso.
+- O toque do alarme para automaticamente após 15 segundos; a notificação também oferece as ações “Soneca (5 min)” e “Dispensar”.
 - Pesquisar lembretes por nome ou descrição e, opcionalmente, exibir o próximo horário na lista.
 - Consultar o histórico dos disparos.
 - Persistir regras e disparos pendentes localmente e reagendar após reinicializações e mudanças de hora/fuso.
@@ -19,9 +20,11 @@ O aplicativo não declara permissão de Internet. Regras, horários pendentes e 
 
 1. Ao ativar uma regra, o app valida seus parâmetros, fixa a data-base da recorrência, sorteia os horários do ciclo e persiste os horários no Room.
 2. O `AlarmManager` agenda somente o próximo horário daquela regra. Os demais horários do ciclo permanecem persistidos localmente.
-3. Quando o alarme dispara, o app registra o horário no histórico, mostra uma notificação e agenda o próximo disparo.
+3. Quando o alarme dispara, o app registra o horário no histórico, mostra uma notificação, toca o som escolhido por até 15 segundos e agenda o próximo disparo.
 4. Ao terminar o ciclo, uma regra recorrente gera o próximo ciclo no dia permitido. Uma regra configurada para executar uma vez é desativada ao terminar.
 5. Após reiniciar o aparelho ou alterar o relógio/fuso, os receivers do app tentam reagendar as regras ativas. Disparos que ficaram no passado são descartados, não executados em atraso.
+
+Na notificação, “Soneca (5 min)” silencia o aviso atual e reapresenta a notificação após cinco minutos. A soneca é independente do ciclo aleatório: não consome nem altera os próximos disparos da regra. “Dispensar” encerra o aviso atual.
 
 ### Regras de horário
 
@@ -113,6 +116,8 @@ Para gerar o APK:
 
 O arquivo será gerado em `app/build/outputs/apk/release/app-release.apk`. Mantenha uma cópia segura do keystore e das credenciais: a mesma chave será necessária para assinar futuras atualizações do aplicativo.
 
+Os diretórios `build/` são artefatos locais de compilação e estão excluídos do Git pelo `.gitignore`.
+
 Os testes unitários cobrem a geração de horários e seus espaçamentos, a recorrência, a validação do formulário e a resolução do texto da notificação.
 
 ## Estrutura do projeto
@@ -161,4 +166,4 @@ Os testes unitários cobrem a geração de horários e seus espaçamentos, a rec
 
 ## Licença
 
-Nenhum arquivo de licença foi identificado neste repositório. Consulte o mantenedor antes de reutilizar ou redistribuir o projeto.
+Este projeto é dedicado ao domínio público sob os termos da [Unlicense](./LICENSE). Você pode usar, copiar, modificar, publicar, distribuir, sublicenciar e/ou vender cópias do projeto sem restrições de copyright, conforme permitido por lei.

@@ -127,6 +127,27 @@ class AlarmScheduler @Inject constructor(
         )?.cancel()
     }
 
+    /** Reagenda uma notificação em 5 minutos sem alterar o ciclo aleatório da regra. */
+    fun scheduleSnooze(ruleId: Long) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+        val triggerAtMillis = System.currentTimeMillis() + SNOOZE_DELAY_MILLIS
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            (ruleId.toInt() xor SNOOZE_REQUEST_MASK),
+            Intent(context, AlarmReceiver::class.java)
+                .setAction(AlarmReceiver.ACTION_SNOOZE_FIRED)
+                .putExtra(AlarmReceiver.EXTRA_RULE_ID, ruleId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val canScheduleExact =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        if (canScheduleExact) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        } else {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        }
+    }
+
     private fun schedule(ruleId: Long, triggerAtMillis: Long) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
         val pendingIntent = PendingIntent.getBroadcast(
@@ -156,4 +177,9 @@ class AlarmScheduler @Inject constructor(
         minSpacingMinutes = minSpacingMinutes,
         intervalDays = intervalDays,
     )
+
+    private companion object {
+        const val SNOOZE_DELAY_MILLIS = 5 * 60 * 1000L
+        const val SNOOZE_REQUEST_MASK = 0x5A5A5A5A
+    }
 }

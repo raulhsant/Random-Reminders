@@ -28,9 +28,29 @@ class AlarmReceiver : BroadcastReceiver() {
     lateinit var appScope: CoroutineScope
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION_ALARM_FIRED) return
         val ruleId = intent.getLongExtra(EXTRA_RULE_ID, -1L)
         if (ruleId <= 0) return
+
+        when (intent.action) {
+            ACTION_SNOOZE_NOTIFICATION -> {
+                notifier.dismissReminder(ruleId)
+                scheduler.scheduleSnooze(ruleId)
+                return
+            }
+            ACTION_DISMISS_NOTIFICATION -> {
+                notifier.dismissReminder(ruleId)
+                return
+            }
+            ACTION_SNOOZE_FIRED -> {
+                appScope.launch {
+                    val rule = repository.getRule(ruleId)
+                    notifier.showReminder(ruleId, rule?.name, rule?.description, rule?.soundUri)
+                }
+                return
+            }
+            ACTION_ALARM_FIRED -> Unit
+            else -> return
+        }
 
         val result = goAsync()
         appScope.launch {
@@ -47,6 +67,9 @@ class AlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_ALARM_FIRED = "com.raulh.randomreminders.ACTION_ALARM_FIRED"
+        const val ACTION_SNOOZE_FIRED = "com.raulh.randomreminders.ACTION_SNOOZE_FIRED"
+        const val ACTION_SNOOZE_NOTIFICATION = "com.raulh.randomreminders.ACTION_SNOOZE_NOTIFICATION"
+        const val ACTION_DISMISS_NOTIFICATION = "com.raulh.randomreminders.ACTION_DISMISS_NOTIFICATION"
         const val EXTRA_RULE_ID = "rule_id"
     }
 }
