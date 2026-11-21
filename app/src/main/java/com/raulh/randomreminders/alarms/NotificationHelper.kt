@@ -3,17 +3,16 @@ package com.raulh.randomreminders.alarms
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.media.RingtoneManager
-import android.os.Build
-import android.net.Uri
 import android.content.Context
 import android.content.Intent
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.media.Ringtone
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.raulh.randomreminders.MainActivity
 import com.raulh.randomreminders.R
 import com.raulh.randomreminders.domain.NotificationMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -32,26 +31,22 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
         val notificationId = ruleId.hashCode()
+        val title = ruleName?.takeIf(String::isNotBlank) ?: context.getString(R.string.app_name)
+        val message = NotificationMessage.resolve(
+            description,
+            context.getString(R.string.reminder_notification_text),
+        )
+        val startedAt = System.currentTimeMillis()
 
         runCatching {
             NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(ruleName?.takeIf(String::isNotBlank) ?: context.getString(R.string.app_name))
-                .setContentText(
-                    NotificationMessage.resolve(
-                        description,
-                        context.getString(R.string.reminder_notification_text),
-                    ),
-                )
+                .setContentTitle(title)
+                .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(false)
-                .setFullScreenIntent(contentIntent(), true)
-                .addAction(
-                    0,
-                    context.getString(R.string.action_snooze),
-                    actionIntent(ruleId, AlarmReceiver.ACTION_SNOOZE_NOTIFICATION, SNOOZE_REQUEST_CODE),
-                )
+                .setFullScreenIntent(alarmIntent(ruleId, title, message, startedAt), true)
                 .addAction(
                     0,
                     context.getString(R.string.action_dismiss),
@@ -64,7 +59,9 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
         timeoutRunnables[ruleId]?.let { timeoutHandler.removeCallbacks(it) }
         val timeoutRunnable = Runnable { dismissReminder(ruleId) }
         timeoutRunnables[ruleId] = timeoutRunnable
-        timeoutHandler.postDelayed(timeoutRunnable, ALARM_DURATION_MILLIS)
+        val remainingMillis = (ALARM_DURATION_MILLIS - (System.currentTimeMillis() - startedAt))
+            .coerceAtLeast(0L)
+        timeoutHandler.postDelayed(timeoutRunnable, remainingMillis)
     }
 
     fun dismissReminder(ruleId: Long) {
@@ -85,12 +82,19 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
             .forEach { context.getSystemService(NotificationManager::class.java).deleteNotificationChannel(it.id) }
     }
 
-    private fun contentIntent(): PendingIntent = PendingIntent.getActivity(
-        context,
-        CONTENT_REQUEST_CODE,
-        Intent(context, MainActivity::class.java),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
+    private fun alarmIntent(ruleId: Long, title: String, message: String, startedAt: Long): PendingIntent {
+        val intent = Intent(context, AlarmActivity::class.java)
+            .putExtra(AlarmActivity.EXTRA_RULE_ID, ruleId)
+            .putExtra(AlarmActivity.EXTRA_STARTED_AT, startedAt)
+            .putExtra(AlarmActivity.EXTRA_TITLE, title)
+            .putExtra(AlarmActivity.EXTRA_MESSAGE, message)
+        return PendingIntent.getActivity(
+            context,
+            ruleId.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
 
     private fun actionIntent(ruleId: Long, action: String, requestCode: Int): PendingIntent =
         PendingIntent.getBroadcast(
@@ -147,8 +151,6 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
     }
 
     private companion object {
-        const val CONTENT_REQUEST_CODE = 11
-        const val SNOOZE_REQUEST_CODE = 12
         const val DISMISS_REQUEST_CODE = 13
         const val ALARM_DURATION_MILLIS = 15_000L
     }

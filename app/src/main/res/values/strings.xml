@@ -27,7 +27,6 @@
     <string name="sound_silent">Sem som</string>
     <string name="sound_selected_fallback">Toque selecionado</string>
     <string name="action_select_sound">Selecionar toque</string>
-    <string name="action_snooze">Soneca (5 min)</string>
     <string name="action_dismiss">Dispensar</string>
     <string name="summary_once">uma vez</string>
 

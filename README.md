@@ -9,7 +9,7 @@ Aplicativo Android para criar lembretes que tocam em horários aleatórios dentr
 - Escolher o início e o fim da janela diária, o número de disparos por ciclo e o espaçamento mínimo entre eles.
 - Repetir a cada N dias (1 significa todos os dias) ou executar uma única vez.
 - Escolher o toque do alarme, usar o padrão do Android ou deixar o lembrete silencioso.
-- O toque do alarme para automaticamente após 15 segundos; a notificação também oferece as ações “Soneca (5 min)” e “Dispensar”.
+- O alarme toca por até 15 segundos e pode ser dispensado pelo usuário. Quando permitido pelo Android, ele abre uma tela inteira mesmo com o aparelho bloqueado ou com a tela desligada.
 - Pesquisar lembretes por nome ou descrição e, opcionalmente, exibir o próximo horário na lista.
 - Consultar o histórico dos disparos.
 - Persistir regras e disparos pendentes localmente e reagendar após reinicializações e mudanças de hora/fuso.
@@ -24,7 +24,7 @@ O aplicativo não declara permissão de Internet. Regras, horários pendentes e 
 4. Ao terminar o ciclo, uma regra recorrente gera o próximo ciclo no dia permitido. Uma regra configurada para executar uma vez é desativada ao terminar.
 5. Após reiniciar o aparelho ou alterar o relógio/fuso, os receivers do app tentam reagendar as regras ativas. Disparos que ficaram no passado são descartados, não executados em atraso.
 
-Na notificação, “Soneca (5 min)” silencia o aviso atual e reapresenta a notificação após cinco minutos. A soneca é independente do ciclo aleatório: não consome nem altera os próximos disparos da regra. “Dispensar” encerra o aviso atual.
+“Dispensar” encerra o aviso atual. O alarme para automaticamente após 15 segundos.
 
 ### Regras de horário
 
