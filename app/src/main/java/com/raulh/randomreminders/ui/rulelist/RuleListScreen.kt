@@ -1,5 +1,8 @@
 package com.raulh.randomreminders.ui.rulelist
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,25 +28,34 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.raulh.randomreminders.R
+import com.raulh.randomreminders.ui.ReminderPermissions
 
 /**
  * Lista de lembretes: resumo da regra, próximo disparo, interruptor on/off,
@@ -58,6 +70,38 @@ fun RuleListScreen(
     viewModel: RuleListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Reavalia as permissões ao voltar das telas de configuração do Android.
+    var permissionsTick by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionsTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { permissionsTick++ }
+    var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
+    val needsNotificationPermission = remember(permissionsTick) {
+        ReminderPermissions.needsNotificationPermission(context)
+    }
+    LaunchedEffect(needsNotificationPermission) {
+        if (needsNotificationPermission && !notificationPermissionRequested) {
+            notificationPermissionRequested = true
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    val needsExactAlarm = remember(permissionsTick) {
+        ReminderPermissions.needsExactAlarmPermission(context)
+    }
+    val needsFullScreen = remember(permissionsTick) {
+        ReminderPermissions.needsFullScreenIntentPermission(context)
+    }
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val visibleRules = state.rules.filter { item ->
@@ -95,6 +139,18 @@ fun RuleListScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item(key = "mascot-header") { MascotHeader() }
+                if (needsExactAlarm || needsFullScreen) {
+                    item(key = "alarm-permissions") {
+                        AlarmPermissionNotice(
+                            needsExactAlarm = needsExactAlarm,
+                            needsFullScreen = needsFullScreen,
+                            onOpenExactAlarm = { ReminderPermissions.openExactAlarmSettings(context) },
+                            onOpenFullScreen = {
+                                ReminderPermissions.openFullScreenIntentSettings(context)
+                            },
+                        )
+                    }
+                }
                 item(key = "alarm-search") {
                     OutlinedTextField(
                         value = searchQuery,
@@ -147,6 +203,44 @@ private fun MascotHeader() {
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
         )
+    }
+}
+
+@Composable
+private fun AlarmPermissionNotice(
+    needsExactAlarm: Boolean,
+    needsFullScreen: Boolean,
+    onOpenExactAlarm: () -> Unit,
+    onOpenFullScreen: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.permission_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (needsExactAlarm) {
+                Text(
+                    text = stringResource(R.string.permission_exact_alarm),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedButton(onClick = onOpenExactAlarm, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.action_allow_exact_alarm))
+                }
+            }
+            if (needsFullScreen) {
+                Text(
+                    text = stringResource(R.string.permission_full_screen),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedButton(onClick = onOpenFullScreen, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.action_allow_full_screen))
+                }
+            }
+        }
     }
 }
 

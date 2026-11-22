@@ -3,8 +3,8 @@
     <string name="app_name">Random Reminders</string>
 
     <!-- Notificações -->
-    <string name="channel_reminders_name">Lembretes aleatórios</string>
-    <string name="channel_reminders_description">Notificações dos lembretes disparados em horários aleatórios</string>
+    <string name="channel_reminders_name">Alarmes aleatórios</string>
+    <string name="channel_reminders_description">Alarmes dos lembretes disparados em horários aleatórios</string>
     <string name="reminder_notification_text">Hora do seu lembrete</string>
 
     <!-- Tela de acionamento -->
@@ -28,6 +28,12 @@
     <string name="sound_selected_fallback">Toque selecionado</string>
     <string name="action_select_sound">Selecionar toque</string>
     <string name="action_dismiss">Dispensar</string>
+    <string name="action_stop_alarm">Parar alarme</string>
+    <string name="permission_title">Permissões do alarme</string>
+    <string name="permission_exact_alarm">Permita alarmes exatos para o lembrete tocar no horário sorteado, mesmo com economia de bateria.</string>
+    <string name="permission_full_screen">Permita notificações em tela cheia para a tela do alarme aparecer com o aparelho bloqueado.</string>
+    <string name="action_allow_exact_alarm">Permitir alarmes exatos</string>
+    <string name="action_allow_full_screen">Permitir tela cheia</string>
     <string name="summary_once">uma vez</string>
 
     <!-- Lista / editor / histórico (etapa 2) -->

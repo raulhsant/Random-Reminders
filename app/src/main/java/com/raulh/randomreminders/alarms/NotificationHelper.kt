@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
@@ -20,52 +21,61 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Publica a notificação estilo "despertador" disparada pelo [AlarmReceiver]:
- * canal de alta prioridade + full-screen intent para aparecer na tela de bloqueio.
+ * Publica a notificação de alarme disparada pelo [AlarmReceiver] e toca o som
+ * no stream de alarme do Android por até 15 segundos.
  */
 @Singleton
 class NotificationHelper @Inject constructor(@ApplicationContext private val context: Context) {
 
-    fun showReminder(ruleId: Long, ruleName: String?, description: String?, soundUri: String?) {
+    /**
+     * Mostra o alarme e devolve o intent da tela para o receiver abrir.
+     * O retorno independe da permissão de notificações: mesmo sem notificação,
+     * o som e a tela do alarme devem funcionar.
+     */
+    fun showReminder(
+        ruleId: Long,
+        ruleName: String?,
+        description: String?,
+        soundUri: String?,
+    ): Intent {
         val channelId = ensureChannel(ruleId, ruleName, soundUri)
-        val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return
-        val notificationId = ruleId.hashCode()
         val title = ruleName?.takeIf(String::isNotBlank) ?: context.getString(R.string.app_name)
         val message = NotificationMessage.resolve(
             description,
             context.getString(R.string.reminder_notification_text),
         )
         val startedAt = System.currentTimeMillis()
+        val screenIntent = alarmScreenIntent(ruleId, title, message, startedAt)
 
-        runCatching {
-            NotificationCompat.Builder(context, channelId)
+        val manager = NotificationManagerCompat.from(context)
+        if (manager.areNotificationsEnabled()) {
+            val notification = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setWhen(startedAt)
+                .setShowWhen(true)
                 .setAutoCancel(false)
-                .setFullScreenIntent(alarmIntent(ruleId, title, message, startedAt), true)
+                .setOngoing(true)
+                .setContentIntent(activityPendingIntent(screenIntent, ruleId))
+                .setFullScreenIntent(activityPendingIntent(screenIntent, ruleId), true)
                 .addAction(
                     0,
                     context.getString(R.string.action_dismiss),
                     actionIntent(ruleId, AlarmReceiver.ACTION_DISMISS_NOTIFICATION, DISMISS_REQUEST_CODE),
                 )
                 .build()
-                .also { manager.notify(notificationId, it) }
+            runCatching { manager.notify(ruleId.hashCode(), notification) }
         }
+
         startAlarmSound(ruleId, soundUri)
-        timeoutRunnables[ruleId]?.let { timeoutHandler.removeCallbacks(it) }
-        val timeoutRunnable = Runnable { dismissReminder(ruleId) }
-        timeoutRunnables[ruleId] = timeoutRunnable
-        val remainingMillis = (ALARM_DURATION_MILLIS - (System.currentTimeMillis() - startedAt))
-            .coerceAtLeast(0L)
-        timeoutHandler.postDelayed(timeoutRunnable, remainingMillis)
+        return screenIntent
     }
 
     fun dismissReminder(ruleId: Long) {
-        timeoutRunnables.remove(ruleId)?.let { timeoutHandler.removeCallbacks(it) }
         stopAlarmSound(ruleId)
         NotificationManagerCompat.from(context).cancel(ruleId.hashCode())
     }
@@ -82,19 +92,24 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
             .forEach { context.getSystemService(NotificationManager::class.java).deleteNotificationChannel(it.id) }
     }
 
-    private fun alarmIntent(ruleId: Long, title: String, message: String, startedAt: Long): PendingIntent {
-        val intent = Intent(context, AlarmActivity::class.java)
-            .putExtra(AlarmActivity.EXTRA_RULE_ID, ruleId)
-            .putExtra(AlarmActivity.EXTRA_STARTED_AT, startedAt)
-            .putExtra(AlarmActivity.EXTRA_TITLE, title)
-            .putExtra(AlarmActivity.EXTRA_MESSAGE, message)
-        return PendingIntent.getActivity(
+    private fun alarmScreenIntent(
+        ruleId: Long,
+        title: String,
+        message: String,
+        startedAt: Long,
+    ): Intent = Intent(context, AlarmActivity::class.java)
+        .putExtra(AlarmActivity.EXTRA_RULE_ID, ruleId)
+        .putExtra(AlarmActivity.EXTRA_STARTED_AT, startedAt)
+        .putExtra(AlarmActivity.EXTRA_TITLE, title)
+        .putExtra(AlarmActivity.EXTRA_MESSAGE, message)
+
+    private fun activityPendingIntent(intent: Intent, ruleId: Long): PendingIntent =
+        PendingIntent.getActivity(
             context,
             ruleId.toInt(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-    }
 
     private fun actionIntent(ruleId: Long, action: String, requestCode: Int): PendingIntent =
         PendingIntent.getBroadcast(
@@ -109,16 +124,38 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
     private fun startAlarmSound(ruleId: Long, soundUri: String?) {
         stopAlarmSound(ruleId)
         val uri = soundUri.toSoundUri() ?: return
-        val ringTone = runCatching { RingtoneManager.getRingtone(context, uri) }.getOrNull()
-        ringTones[ruleId] = ringTone ?: return
+        val ringTone = runCatching { RingtoneManager.getRingtone(context, uri) }.getOrNull() ?: return
         ringTone.apply {
+            // USAGE_ALARM roteia o som pelo volume de alarme e faz o Android
+            // tratá-lo como alarme, não como toque de chamada.
+            audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 isLooping = true
             }
         }.play()
+        ringTones[ruleId] = ringTone
+        val stopSound = Runnable { stopAlarmSound(ruleId) }
+        soundStopRunnables[ruleId] = stopSound
+        ringtoneLoopHandler.postDelayed(stopSound, ALARM_SOUND_DURATION_MILLIS)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            val restart = object : Runnable {
+                override fun run() {
+                    if (ringTones[ruleId] !== ringTone) return
+                    if (!ringTone.isPlaying) ringTone.play()
+                    ringtoneLoopHandler.postDelayed(this, RINGTONE_RESTART_INTERVAL_MILLIS)
+                }
+            }
+            ringLoopRunnables[ruleId] = restart
+            ringtoneLoopHandler.postDelayed(restart, RINGTONE_RESTART_INTERVAL_MILLIS)
+        }
     }
 
     private fun stopAlarmSound(ruleId: Long) {
+        soundStopRunnables.remove(ruleId)?.let(ringtoneLoopHandler::removeCallbacks)
+        ringLoopRunnables.remove(ruleId)?.let(ringtoneLoopHandler::removeCallbacks)
         ringTones.remove(ruleId)?.stop()
     }
 
@@ -132,6 +169,7 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
             description = context.getString(R.string.channel_reminders_description)
             enableVibration(true)
             setSound(null, null)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         }
         val systemManager = context.getSystemService(NotificationManager::class.java)
         systemManager.notificationChannels
@@ -152,10 +190,12 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
 
     private companion object {
         const val DISMISS_REQUEST_CODE = 13
-        const val ALARM_DURATION_MILLIS = 15_000L
+        const val ALARM_SOUND_DURATION_MILLIS = 15_000L
+        const val RINGTONE_RESTART_INTERVAL_MILLIS = 1_000L
     }
 
-    private val timeoutHandler = Handler(Looper.getMainLooper())
-    private val timeoutRunnables = mutableMapOf<Long, Runnable>()
+    private val ringtoneLoopHandler = Handler(Looper.getMainLooper())
+    private val soundStopRunnables = mutableMapOf<Long, Runnable>()
+    private val ringLoopRunnables = mutableMapOf<Long, Runnable>()
     private val ringTones = mutableMapOf<Long, Ringtone>()
 }

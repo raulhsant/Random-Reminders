@@ -9,7 +9,7 @@ Aplicativo Android para criar lembretes que tocam em horários aleatórios dentr
 - Escolher o início e o fim da janela diária, o número de disparos por ciclo e o espaçamento mínimo entre eles.
 - Repetir a cada N dias (1 significa todos os dias) ou executar uma única vez.
 - Escolher o toque do alarme, usar o padrão do Android ou deixar o lembrete silencioso.
-- O alarme toca por até 15 segundos e pode ser dispensado pelo usuário. Quando permitido pelo Android, ele abre uma tela inteira mesmo com o aparelho bloqueado ou com a tela desligada.
+- O alarme é registrado no Android como um alarme de verdade (`setAlarmClock`), com ícone de alarme na barra de status e tratamento de alarme pelo sistema. Ao tocar, abre uma tela cheia com a opção de pará-lo; o som toca por até 15 segundos, enquanto a tela permanece aberta até o usuário fechá-la. Quando permitido pelo Android, a tela aparece mesmo com o aparelho bloqueado ou com a tela desligada.
 - Pesquisar lembretes por nome ou descrição e, opcionalmente, exibir o próximo horário na lista.
 - Consultar o histórico dos disparos.
 - Persistir regras e disparos pendentes localmente e reagendar após reinicializações e mudanças de hora/fuso.
@@ -19,12 +19,12 @@ O aplicativo não declara permissão de Internet. Regras, horários pendentes e 
 ## Como funciona
 
 1. Ao ativar uma regra, o app valida seus parâmetros, fixa a data-base da recorrência, sorteia os horários do ciclo e persiste os horários no Room.
-2. O `AlarmManager` agenda somente o próximo horário daquela regra. Os demais horários do ciclo permanecem persistidos localmente.
-3. Quando o alarme dispara, o app registra o horário no histórico, mostra uma notificação, toca o som escolhido por até 15 segundos e agenda o próximo disparo.
+2. O `AlarmManager` agenda somente o próximo horário daquela regra usando `setAlarmClock`, para que o Android o reconheça como alarme. Os demais horários do ciclo permanecem persistidos localmente.
+3. Quando o alarme dispara, o app registra o horário no histórico, mostra uma notificação de alarme, toca o som escolhido no stream de alarme do Android por até 15 segundos, abre a tela do alarme para o usuário fechá-la e agenda o próximo disparo.
 4. Ao terminar o ciclo, uma regra recorrente gera o próximo ciclo no dia permitido. Uma regra configurada para executar uma vez é desativada ao terminar.
 5. Após reiniciar o aparelho ou alterar o relógio/fuso, os receivers do app tentam reagendar as regras ativas. Disparos que ficaram no passado são descartados, não executados em atraso.
 
-“Dispensar” encerra o aviso atual. O alarme para automaticamente após 15 segundos.
+“Parar alarme” encerra o aviso atual.
 
 ### Regras de horário
 
@@ -40,9 +40,10 @@ O aplicativo não declara permissão de Internet. Regras, horários pendentes e 
 | Permissão | Para que serve |
 |---|---|
 | `POST_NOTIFICATIONS` | Exibir notificações no Android 13 ou superior. Se negada ou se as notificações estiverem desativadas, o app não consegue mostrar o lembrete. |
-| `SCHEDULE_EXACT_ALARM` | Permitir alarmes pontuais no Android 12 ou superior. Se não estiver disponível, o app usa um alarme inexato, que pode atrasar. |
+| `SCHEDULE_EXACT_ALARM` | Permitir alarmes pontuais no Android 12. Se não estiver disponível, o app usa um alarme inexato, que pode atrasar. |
+| `USE_EXACT_ALARM` | Conceder alarmes exatos automaticamente no Android 13+, por se tratar de um app de alarmes. |
 | `RECEIVE_BOOT_COMPLETED` | Reagendar regras ativas após a inicialização do aparelho. |
-| `USE_FULL_SCREEN_INTENT` | Solicitar ao Android a apresentação de notificação em tela cheia, quando permitido pelo sistema. |
+| `USE_FULL_SCREEN_INTENT` | Solicitar ao Android a apresentação da tela do alarme com o aparelho bloqueado. No Android 14+, o usuário pode conceder ou revogar essa permissão nas configurações do sistema; o app mostra um atalho para essa tela quando necessário. |
 | `VIBRATE` | Permitir vibração da notificação. |
 
 O sistema pode limitar alarmes em segundo plano, notificações em tela cheia, sons e vibrações. Alarmes inexatos não garantem o minuto configurado. A disponibilidade e o fluxo de concessão das permissões podem variar entre versões do Android e fabricantes.
@@ -153,14 +154,16 @@ Os testes unitários cobrem a geração de horários e seus espaçamentos, a rec
 - `data/ReminderRepository` e `data/db`: persistência de regras, disparos pendentes e histórico.
 - `alarms/AlarmScheduler`: ativação, cancelamento e reagendamento de ciclos.
 - `alarms/AlarmReceiver` e `alarms/BootReceiver`: processamento de disparos e recuperação após eventos do sistema.
-- `alarms/NotificationHelper`: canais e notificações de cada lembrete.
+- `alarms/AlarmActivity`: tela cheia do alarme, aberta no disparo para permitir parar o som.
+- `alarms/NotificationHelper`: canais, notificação de alarme e som no stream de alarme.
 - `ui/rulelist`, `ui/ruledit` e `ui/history`: telas e seus ViewModels.
 
 ## Limitações conhecidas
 
 - O app não sincroniza dados entre dispositivos nem oferece cópia de segurança/exportação.
 - A precisão depende da permissão de alarmes exatos e das políticas de economia de bateria do dispositivo.
-- Se a permissão de notificação estiver ausente, o disparo não pode ser apresentado como notificação.
+- Se a permissão de notificação estiver ausente, o disparo ainda toca o som e abre a tela do alarme, mas não mostra a notificação.
+- Com o aparelho desbloqueado, o Android costuma apresentar o full-screen intent como um heads-up; o app também tenta abrir a tela do alarme diretamente. Se o fabricante bloquear esse launch em segundo plano, a notificação continua disponível para abrir a tela.
 - Excluir um lembrete também exclui seus disparos pendentes e o histórico associado.
 - O app não oferece suporte a janelas que cruzam a meia-noite.
 

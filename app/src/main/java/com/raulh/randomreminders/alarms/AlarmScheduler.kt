@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.raulh.randomreminders.MainActivity
 import com.raulh.randomreminders.data.ReminderRepository
 import com.raulh.randomreminders.data.db.RuleEntity
 import com.raulh.randomreminders.domain.RandomTimeGenerator
@@ -143,11 +144,27 @@ class AlarmScheduler @Inject constructor(
         val canScheduleExact =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         if (canScheduleExact) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            // setAlarmClock faz o Android tratar o disparo como alarme de verdade:
+            // ícone de alarme na barra de status, exibição em "Próximo alarme" e
+            // isenção de Não Perturbe. O showIntent abre o app ao tocar no ícone.
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAtMillis, showAlarmPendingIntent(ruleId)),
+                pendingIntent,
+            )
         } else {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
         }
     }
+
+    /** PendingIntent usado pelo ícone de alarme do sistema para abrir o app. */
+    private fun showAlarmPendingIntent(ruleId: Long): PendingIntent =
+        PendingIntent.getActivity(
+            context,
+            ruleId.toInt(),
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
     private fun RuleEntity.toDomainRule(): ReminderRule = ReminderRule(
         start = LocalTime.of(startMinutes / 60, startMinutes % 60),
