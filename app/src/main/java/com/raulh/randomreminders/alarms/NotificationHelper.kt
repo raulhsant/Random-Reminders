@@ -71,12 +71,12 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
             runCatching { manager.notify(ruleId.hashCode(), notification) }
         }
 
-        startAlarmSound(ruleId, soundUri)
+        alarmSoundController.start(ruleId, soundUri)
         return screenIntent
     }
 
     fun dismissReminder(ruleId: Long) {
-        stopAlarmSound(ruleId)
+        alarmSoundController.stop(ruleId)
         NotificationManagerCompat.from(context).cancel(ruleId.hashCode())
     }
 
@@ -121,10 +121,9 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    private fun startAlarmSound(ruleId: Long, soundUri: String?) {
-        stopAlarmSound(ruleId)
-        val uri = soundUri.toSoundUri() ?: return
-        val ringTone = runCatching { RingtoneManager.getRingtone(context, uri) }.getOrNull() ?: return
+    private fun createAlarmTone(soundUri: String?): AlarmTone? {
+        val uri = soundUri.toSoundUri() ?: return null
+        val ringTone = runCatching { RingtoneManager.getRingtone(context, uri) }.getOrNull() ?: return null
         ringTone.apply {
             // USAGE_ALARM roteia o som pelo volume de alarme e faz o Android
             // tratá-lo como alarme, não como toque de chamada.
@@ -132,31 +131,25 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                isLooping = true
-            }
-        }.play()
-        ringTones[ruleId] = ringTone
-        val stopSound = Runnable { stopAlarmSound(ruleId) }
-        soundStopRunnables[ruleId] = stopSound
-        ringtoneLoopHandler.postDelayed(stopSound, ALARM_SOUND_DURATION_MILLIS)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            val restart = object : Runnable {
-                override fun run() {
-                    if (ringTones[ruleId] !== ringTone) return
-                    if (!ringTone.isPlaying) ringTone.play()
-                    ringtoneLoopHandler.postDelayed(this, RINGTONE_RESTART_INTERVAL_MILLIS)
-                }
-            }
-            ringLoopRunnables[ruleId] = restart
-            ringtoneLoopHandler.postDelayed(restart, RINGTONE_RESTART_INTERVAL_MILLIS)
         }
-    }
+        return object : AlarmTone {
+            override var isLooping: Boolean
+                get() = ringTone.isLooping
+                set(value) {
+                    ringTone.isLooping = value
+                }
 
-    private fun stopAlarmSound(ruleId: Long) {
-        soundStopRunnables.remove(ruleId)?.let(ringtoneLoopHandler::removeCallbacks)
-        ringLoopRunnables.remove(ruleId)?.let(ringtoneLoopHandler::removeCallbacks)
-        ringTones.remove(ruleId)?.stop()
+            override val isPlaying: Boolean
+                get() = ringTone.isPlaying
+
+            override fun play() {
+                ringTone.play()
+            }
+
+            override fun stop() {
+                ringTone.stop()
+            }
+        }
     }
 
     private fun ensureChannel(ruleId: Long, ruleName: String?, soundUri: String?): String {
@@ -190,12 +183,16 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
 
     private companion object {
         const val DISMISS_REQUEST_CODE = 13
-        const val ALARM_SOUND_DURATION_MILLIS = 15_000L
-        const val RINGTONE_RESTART_INTERVAL_MILLIS = 1_000L
     }
 
-    private val ringtoneLoopHandler = Handler(Looper.getMainLooper())
-    private val soundStopRunnables = mutableMapOf<Long, Runnable>()
-    private val ringLoopRunnables = mutableMapOf<Long, Runnable>()
-    private val ringTones = mutableMapOf<Long, Ringtone>()
+    private val alarmSoundController = AlarmSoundController(
+        supportsNativeLooping = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P,
+        createTone = ::createAlarmTone,
+        scheduler = AlarmSoundScheduler { delayMillis, action ->
+            val runnable = Runnable(action)
+            val handler = Handler(Looper.getMainLooper())
+            handler.postDelayed(runnable, delayMillis)
+            AlarmSoundCancellation { handler.removeCallbacks(runnable) }
+        },
+    )
 }
